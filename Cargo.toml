@@ -1,0 +1,8 @@
+[package]
+name = "conservation-rhythm-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Conservation laws for rhythmic energy in ensembles — γ + H = C"
+license = "MIT"
+
+[dependencies]
