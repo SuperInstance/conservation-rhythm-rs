@@ -14,7 +14,11 @@ pub struct RhythmicEnergy {
 impl RhythmicEnergy {
     /// Create a new rhythmic energy with given kinetic and harmonic components.
     pub fn new(agent_id: usize, kinetic: f64, harmonic: f64) -> Self {
-        Self { agent_id, kinetic, harmonic }
+        Self {
+            agent_id,
+            kinetic,
+            harmonic,
+        }
     }
 
     /// Total energy: γ + H.
@@ -41,7 +45,11 @@ impl RhythmicEnergy {
     }
 
     /// Shift energy toward kinetic by a factor in [0, 1].
+    ///
+    /// Values outside `[0, 1]` are clamped so the returned energy always
+    /// remains a valid partition of the agent's total energy.
     pub fn shift_kinetic(&self, factor: f64) -> Self {
+        let factor = factor.clamp(0.0, 1.0);
         let total = self.total();
         let new_kinetic = self.kinetic + factor * self.harmonic;
         let new_kinetic = new_kinetic.min(total);
@@ -53,7 +61,11 @@ impl RhythmicEnergy {
     }
 
     /// Shift energy toward harmonic by a factor in [0, 1].
+    ///
+    /// Values outside `[0, 1]` are clamped so the returned energy always
+    /// remains a valid partition of the agent's total energy.
     pub fn shift_harmonic(&self, factor: f64) -> Self {
+        let factor = factor.clamp(0.0, 1.0);
         let total = self.total();
         let new_harmonic = self.harmonic + factor * self.kinetic;
         let new_harmonic = new_harmonic.min(total);
@@ -67,7 +79,11 @@ impl RhythmicEnergy {
     /// Ratio of kinetic to total energy.
     pub fn kinetic_ratio(&self) -> f64 {
         let total = self.total();
-        if total == 0.0 { 0.5 } else { self.kinetic / total }
+        if total == 0.0 {
+            0.5
+        } else {
+            self.kinetic / total
+        }
     }
 
     /// Zero energy for an agent.
@@ -127,7 +143,11 @@ impl EnsembleEnergy {
 
     /// Update energy for a specific agent.
     pub fn update_agent(&mut self, updated: RhythmicEnergy) {
-        if let Some(agent) = self.agents.iter_mut().find(|a| a.agent_id == updated.agent_id) {
+        if let Some(agent) = self
+            .agents
+            .iter_mut()
+            .find(|a| a.agent_id == updated.agent_id)
+        {
             *agent = updated;
         }
     }
@@ -181,6 +201,27 @@ mod tests {
         let shifted = e.shift_kinetic(0.5);
         assert!((shifted.kinetic - 6.0).abs() < 1e-10);
         assert!((shifted.harmonic - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_shift_harmonic() {
+        let e = RhythmicEnergy::new(0, 8.0, 2.0);
+        let shifted = e.shift_harmonic(0.5);
+        assert!((shifted.kinetic - 4.0).abs() < 1e-10);
+        assert!((shifted.harmonic - 6.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_shift_factors_are_clamped() {
+        let e = RhythmicEnergy::new(0, 2.0, 8.0);
+
+        let over = e.shift_kinetic(2.0);
+        assert!((over.kinetic - 10.0).abs() < 1e-10);
+        assert!((over.harmonic).abs() < 1e-10);
+
+        let under = e.shift_kinetic(-1.0);
+        assert!((under.kinetic - 2.0).abs() < 1e-10);
+        assert!((under.harmonic - 8.0).abs() < 1e-10);
     }
 
     #[test]
