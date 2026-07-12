@@ -26,7 +26,10 @@ pub struct ConservationLaw {
 impl ConservationLaw {
     /// Create a new conservation law with given constant and tolerance.
     pub fn new(constant_c: f64, tolerance: f64) -> Self {
-        Self { constant_c, tolerance }
+        Self {
+            constant_c,
+            tolerance,
+        }
     }
 
     /// Derive the conservation constant from an ensemble.
@@ -63,26 +66,33 @@ impl ConservationLaw {
 
     /// Verify that per-agent energy is individually conserved.
     /// (Each agent has its own C from when it was initialized.)
-    pub fn check_per_agent(agent_constants: &[(usize, f64)], agents: &[RhythmicEnergy], tolerance: f64) -> Vec<ConservationResult> {
-        agent_constants.iter().map(|(id, c)| {
-            if let Some(agent) = agents.iter().find(|a| a.agent_id == *id) {
-                let current = agent.total();
-                let deviation = (current - c).abs();
-                ConservationResult {
-                    initial_total: *c,
-                    current_total: current,
-                    is_conserved: deviation <= tolerance,
-                    deviation,
+    pub fn check_per_agent(
+        agent_constants: &[(usize, f64)],
+        agents: &[RhythmicEnergy],
+        tolerance: f64,
+    ) -> Vec<ConservationResult> {
+        agent_constants
+            .iter()
+            .map(|(id, c)| {
+                if let Some(agent) = agents.iter().find(|a| a.agent_id == *id) {
+                    let current = agent.total();
+                    let deviation = (current - c).abs();
+                    ConservationResult {
+                        initial_total: *c,
+                        current_total: current,
+                        is_conserved: deviation <= tolerance,
+                        deviation,
+                    }
+                } else {
+                    ConservationResult {
+                        initial_total: *c,
+                        current_total: 0.0,
+                        is_conserved: false,
+                        deviation: *c,
+                    }
                 }
-            } else {
-                ConservationResult {
-                    initial_total: *c,
-                    current_total: 0.0,
-                    is_conserved: false,
-                    deviation: *c,
-                }
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Normalize an ensemble to satisfy conservation by rescaling.
@@ -105,9 +115,7 @@ mod tests {
 
     #[test]
     fn test_conservation_holds() {
-        let ensemble = EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 5.0, 5.0),
-        ]);
+        let ensemble = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 5.0, 5.0)]);
         let law = ConservationLaw::from_ensemble(&ensemble, 1e-10);
         let result = law.check_ensemble(&ensemble);
         assert!(result.is_conserved);
@@ -116,9 +124,7 @@ mod tests {
     #[test]
     fn test_conservation_violation_detected() {
         let law = ConservationLaw::new(10.0, 0.01);
-        let ensemble = EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 6.0, 5.0),
-        ]);
+        let ensemble = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 6.0, 5.0)]);
         let result = law.check_ensemble(&ensemble);
         assert!(!result.is_conserved);
     }
@@ -126,9 +132,7 @@ mod tests {
     #[test]
     fn test_enforce_conservation() {
         let law = ConservationLaw::new(10.0, 1e-10);
-        let mut ensemble = EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 6.0, 6.0),
-        ]);
+        let mut ensemble = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 6.0, 6.0)]);
         law.enforce_ensemble(&mut ensemble);
         assert!((ensemble.total() - 10.0).abs() < 1e-10);
     }
