@@ -4,6 +4,12 @@
 
 Self-Improving Band: conservation-rhythm-rs
 
+> **Status marker:** This crate currently provides deterministic
+> conservation-law primitives (energy accounting, transfer, budget
+> allocation, and equilibrium detection). The "Self-Improving Band" label
+> reflects the repository's fleet role; an autonomous learning or
+> self-improvement loop is **not yet implemented**.
+
 ---
 
 ## Quick Start
@@ -11,6 +17,9 @@ Self-Improving Band: conservation-rhythm-rs
 ```bash
 git clone https://github.com/SuperInstance/conservation-rhythm-rs
 cd conservation-rhythm-rs
+cargo test
+cargo clippy -- -D warnings
+cargo fmt --check
 ```
 
 ## About
