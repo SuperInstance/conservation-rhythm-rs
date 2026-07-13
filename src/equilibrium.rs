@@ -27,7 +27,8 @@ impl Default for EquilibriumCriteria {
 #[derive(Debug, Clone)]
 pub struct EquilibriumDetector {
     pub criteria: EquilibriumCriteria,
-    /// History of ensemble snapshots.
+    /// Recent history of ensemble snapshots (kept to the last two entries
+    /// to avoid unbounded growth in long-running production use).
     pub history: Vec<EnsembleEnergy>,
     /// Count of consecutive stable checks.
     pub stable_count: usize,
@@ -46,6 +47,11 @@ impl EquilibriumDetector {
     /// Record a new ensemble snapshot.
     pub fn observe(&mut self, ensemble: &EnsembleEnergy) {
         self.history.push(ensemble.clone());
+        // Only the most recent two snapshots are needed for stability checks.
+        // Capping the history prevents unbounded memory growth in production.
+        if self.history.len() > 2 {
+            self.history.remove(0);
+        }
         if self.history.len() >= 2 {
             let prev = &self.history[self.history.len() - 2];
             let curr = &self.history[self.history.len() - 1];
@@ -105,11 +111,7 @@ impl EquilibriumDetector {
     }
 
     /// Check if the ensemble kinetic/harmonic ratio has converged to a target.
-    pub fn is_ratio_converged(
-        &self,
-        target_ratio: f64,
-        tolerance: f64,
-    ) -> bool {
+    pub fn is_ratio_converged(&self, target_ratio: f64, tolerance: f64) -> bool {
         if let Some(latest) = self.history.last() {
             let actual = latest.average_kinetic_ratio();
             (actual - target_ratio).abs() <= tolerance
@@ -132,9 +134,7 @@ mod tests {
             stability_window: 3,
         };
         let mut detector = EquilibriumDetector::new(criteria);
-        let ens = EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 5.0, 5.0),
-        ]);
+        let ens = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 5.0, 5.0)]);
         for _ in 0..5 {
             detector.observe(&ens);
         }
@@ -150,9 +150,7 @@ mod tests {
         };
         let mut detector = EquilibriumDetector::new(criteria);
         for i in 0..5 {
-            let ens = EnsembleEnergy::new(vec![
-                RhythmicEnergy::new(0, 5.0 + i as f64, 5.0),
-            ]);
+            let ens = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 5.0 + i as f64, 5.0)]);
             detector.observe(&ens);
         }
         assert!(!detector.is_equilibrium());
@@ -166,9 +164,7 @@ mod tests {
             stability_window: 4,
         };
         let mut detector = EquilibriumDetector::new(criteria);
-        let ens = EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 5.0, 5.0),
-        ]);
+        let ens = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 5.0, 5.0)]);
         for _ in 0..3 {
             detector.observe(&ens);
         }
@@ -181,9 +177,7 @@ mod tests {
     fn test_ratio_converged() {
         let criteria = EquilibriumCriteria::default();
         let mut detector = EquilibriumDetector::new(criteria);
-        let ens = EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 5.0, 5.0),
-        ]);
+        let ens = EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 5.0, 5.0)]);
         detector.observe(&ens);
         assert!(detector.is_ratio_converged(0.5, 0.01));
     }
@@ -192,11 +186,23 @@ mod tests {
     fn test_reset() {
         let criteria = EquilibriumCriteria::default();
         let mut detector = EquilibriumDetector::new(criteria);
-        detector.observe(&EnsembleEnergy::new(vec![
-            RhythmicEnergy::new(0, 5.0, 5.0),
-        ]));
+        detector.observe(&EnsembleEnergy::new(vec![RhythmicEnergy::new(0, 5.0, 5.0)]));
         detector.reset();
         assert!(detector.history.is_empty());
         assert_eq!(detector.stable_count, 0);
+    }
+
+    #[test]
+    fn test_history_is_capped() {
+        let criteria = EquilibriumCriteria::default();
+        let mut detector = EquilibriumDetector::new(criteria);
+        for i in 0..100 {
+            detector.observe(&EnsembleEnergy::new(vec![RhythmicEnergy::new(
+                0,
+                5.0 + i as f64,
+                5.0,
+            )]));
+        }
+        assert_eq!(detector.history.len(), 2);
     }
 }
